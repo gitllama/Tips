@@ -6,29 +6,33 @@
 - Yaml  
 
 ## シリアライズを使用したオブジェクトのディープコピー
-        
+
+参考までにシャローコピー
+
 ```C#
-[Serializable()]
+public MyClass Clone()
+{
+    return base.MemberwiseClone() as MyClass;
+}
+```
+
+```C#
+[Serializable]
 public class Obj
 {
-  public int id;
-  public string name;
-  
-  public static Obj DeepCopy()
-  {
-    MemoryStream mem = new MemoryStream();
-    try
+    public int id;
+    public string name;
+    
+    public static Obj DeepCopy()
     {
-      (new BinaryFormatter()).Serialize(mem, this);
-      mem.Position = 0;
-      return b.Deserialize(mem);
+        using (var stream = new MemoryStream())
+        {
+            BinaryFormatter formatter = new BinaryFormatter();
+            formatter.Serialize(stream, this);
+            stream.Position = 0;
+            return formatter.Deserialize(stream);
+        }
     }
-    finally
-    {
-      mem.Close();
-    }
-    return null;
-  }
 }
 ```
 
