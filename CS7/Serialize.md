@@ -23,7 +23,7 @@ public class Obj
     public int id;
     public string name;
     
-    public static Obj DeepCopy()
+    public Obj DeepCopy()
     {
         using (var stream = new MemoryStream())
         {
