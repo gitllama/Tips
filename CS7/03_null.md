@@ -18,4 +18,34 @@ return s.Length == 0 ? "empty" :
         
 int hage = hoge.HasValue ? hoge.Value : 0;
 int hage = hoge.GetValueOrDefault(0);
+int hage = list?[0]?.ToString() ?? "(null)";
+```
+
+## Null Check
+
+Null条件演算子は三項演算子と違ってスレッドセーフ
+
+```C#
+public event PropertyChangedEventHandler PropertyChanged;
+protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+{
+  // 従来の書き方：C#ではいったん変数にキャッシュする必要がある
+  var eventHandler = PropertyChanged;
+  if (eventHandler != null)
+  {
+    // ここのタイミングで別スレッドからPropertyChanged変数をnullにされても
+    // 問題が起きないように、「eventHandler」変数に代入している
+    eventHandler(this, new PropertyChangedEventArgs(propertyName));
+  }
+}
+
+↓
+
+public event PropertyChangedEventHandler PropertyChanged;
+protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+{
+  // Null条件演算子を使う（スレッドセーフ）
+  PropertyChanged?.Invoke(this,　new PropertyChangedEventArgs(propertyName));
+}
+
 ```
