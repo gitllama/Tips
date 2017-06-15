@@ -21,6 +21,8 @@ public MyClass Clone()
 public class Obj
 {
     public int id;
+    
+    [NonSerialized]
     public string name;
     
     public Obj DeepCopy()
@@ -29,8 +31,11 @@ public class Obj
         {
             BinaryFormatter formatter = new BinaryFormatter();
             formatter.Serialize(stream, this);
-            stream.Position = 0;
-            return formatter.Deserialize(stream);
+            
+            stream.Position = 0; 
+            //stream.Seek(0, System.IO.SeekOrigin.Begin);
+            
+            return (Obj)formatter.Deserialize(stream);
         }
     }
 }
