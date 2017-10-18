@@ -1,0 +1,24 @@
+{
+  "AV18" : { 
+    "Force" : "0", 
+    "ClampHi" : "10mA", 
+    "ClampHi" : "-10mA"
+  },
+  "AV33" : {
+    "Force" : "10",
+    "ClampHi" : "10mA",
+    "ClampHi" : "-10mA"
+  },
+  "DV12" : {
+    "Force" : "0",
+    "ClampHi" : "10mA",
+    "ClampHi" : "-10mA"
+  },
+  "b" : [1,2,3,4],
+  "c" : { "d" : 456 },
+  "AV18" : { 
+    "Force" : "2", 
+    "ClampHi" : "10mA", 
+    "ClampHi" : "-10mA"
+  }
+}
