@@ -1,0 +1,193 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ output extension=".cs" #>
+<#
+	var Type = new List<string>()
+	{
+		"Byte",
+		"UInt16",
+		"UInt32",
+		"UInt64",
+		"Int16",
+		"Int32",
+		"Int64",
+		"Single",
+		"Double"
+	};
+#>
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+
+using Pixels;
+
+namespace Pixels.Math
+{
+    public static class PixelMathEx
+    {
+<# foreach (var T in Type){ #>
+        public static byte ConvertToByte(this <#= T #> value) => (byte)(value > 255 ? 255 : value < 0 ? 0 : value);
+<# } #>
+
+<# foreach (var F in new Dictionary<string,string>()
+{
+	["Add"] = "src[x,y] + value",
+	["Sub"] = "src[x,y] - value",
+	["Mul"] = "src[x,y] * value",
+	["Div"] = "src[x,y] / value",
+
+}){ #>
+<# foreach (var T in Type){ #>
+		public static Pixel<<#= T #>> <#= F.Key #>Self(this Pixel<<#= T #>> src, <#= T #> value) => <#= F.Key #>(src, src, value);
+		public static Pixel<<#= T #>> <#= F.Key #>(this Pixel<<#= T #>> src, <#= T #> value) => <#= F.Key #>(src, PixelFactory.Create<<#= T #>>(src.Maps), value);
+        public static Pixel<<#= T #>> <#= F.Key #>(this Pixel<<#= T #>> src, Pixel<<#= T #>> dst, <#= T #> value)
+        {
+            for (int y = 0; y < src.Height; y++)
+                for (int x = 0; x < src.Width; x++)
+                    dst[x, y] = (<#= T #>)(<#= F.Value #>);
+            return dst;
+        }
+<# } #>
+<# } #>
+<# foreach (var F in new Dictionary<string,string>()
+{
+	["Add"] = "src1[x,y] + src2[x,y]",
+	["Sub"] = "src1[x,y] - src2[x,y]",
+	["Mul"] = "src1[x,y] * src2[x,y]",
+	["Div"] = "src1[x,y] / src2[x,y]",
+
+}){ #>
+<# foreach (var T in Type){ #>
+		public static Pixel<<#= T #>> <#= F.Key #>Self(this Pixel<<#= T #>> src1, Pixel<<#= T #>> src2) => <#= F.Key #>(src1, src1, src2);
+		public static Pixel<<#= T #>> <#= F.Key #>(this Pixel<<#= T #>> src1, Pixel<<#= T #>> src2) => <#= F.Key #>(src1, PixelFactory.Create<<#= T #>>(src1.Maps), src2);
+        public static Pixel<<#= T #>> <#= F.Key #>(this Pixel<<#= T #>> src1, Pixel<<#= T #>> dst, Pixel<<#= T #>> src2)
+        {
+            for (int y = 0; y < src1.Height; y++)
+                for (int x = 0; x < src1.Width; x++)
+                    dst[x, y] = (<#= T #>)(<#= F.Value #>);
+            return dst;
+        }
+<# } #>
+<# } #>
+
+
+
+
+
+
+<# foreach (var F in new Dictionary<string,string>()
+{
+	["BitShiftL"] = "src[x,y] << value",
+	["BitShiftR"] = "src[x,y] >> value",
+}){ #>
+<# foreach (var T in Type.Where(x=>x!="Single" && x!="Double")){ #>
+		public static Pixel<<#= T #>> <#= F.Key #>Self(this Pixel<<#= T #>> src, int value) => <#= F.Key #>(src, src, value);
+		public static Pixel<<#= T #>> <#= F.Key #>(this Pixel<<#= T #>> src, int value) => <#= F.Key #>(src, PixelFactory.Create<<#= T #>>(src.Maps), value);
+        public static Pixel<<#= T #>> <#= F.Key #>(this Pixel<<#= T #>> src, Pixel<<#= T #>> dst, int value)
+        {
+            for (int y = 0; y < src.Height; y++)
+                for (int x = 0; x < src.Width; x++)
+                    dst[x, y] = (<#= T #>)(<#= F.Value #>);
+            return src;
+        }
+<# } #>
+<# } #>
+
+<# foreach (var T in Type){ #>
+        public static int Count(Pixel<<#= T #>> src1, Pixel<<#= T #>> src2, <#= T #> thr)
+        {
+			int count = 0;
+            for (int y = 0; y < src1.Height; y++)
+                for (int x = 0; x < src1.Width; x++)
+                    if((src1[x, y] - src2[x,y]) > thr) count++;
+            return count;
+        }
+<# } #>
+<# foreach (var T in Type){ #>
+        public static double Average(this Pixel<<#= T #>> src)
+        {
+			double dst = 0;
+            for (int y = 0; y < src.Height; y++)
+                for (int x = 0; x < src.Width; x++)
+					dst+=src[x,y];
+			dst/=(src.Width * src.Height);
+				
+            return dst;
+        }
+		public static double AverageBayer(this Pixel<<#= T #>> src,int bayer_x,int bayer_y)
+        {
+			double dst = 0;
+			src.BayerX =bayer_x;
+			src.BayerY =bayer_y;
+            for (int y = 0; y < src.BayerHeight; y++)
+                for (int x = 0; x < src.BayerWidth; x++)
+					dst+=src.Bayer(x,y);
+			dst/=(src.BayerWidth * src.BayerHeight);
+				
+            return dst;
+        }
+		public static double DeviationBayer(this Pixel<<#= T #>> src,int bayer_x,int bayer_y)
+        {
+			src.BayerX =bayer_x;
+			src.BayerY =bayer_y;
+
+			double ave = 0;
+            for (int y = 0; y < src.BayerHeight; y++)
+                for (int x = 0; x < src.BayerWidth; x++)
+				{
+					ave+=src.Bayer(x,y);
+				}	
+			ave/=(src.BayerWidth * src.BayerHeight);
+
+			double dev = 0;
+            for (int y = 0; y < src.BayerHeight; y++)
+                for (int x = 0; x < src.BayerWidth; x++)
+				{
+					dev += (src.Bayer(x,y) - ave) * (src.Bayer(x,y) - ave);
+				}	
+			dev = System.Math.Sqrt(dev / (src.BayerWidth * src.BayerHeight));
+
+            return dev;
+        }
+		public static double VDeviationBayer(this Pixel<<#= T #>> src,int bayer_x,int bayer_y)
+        {
+			src.BayerX =bayer_x;
+			src.BayerY =bayer_y;
+
+			//縦平均
+			var c = new double[src.BayerWidth];
+            for (int y = 0; y < src.BayerHeight; y++)
+                for (int x = 0; x < src.BayerWidth; x++)
+				{
+					c[x]+=src.Bayer(x,y);
+				}
+            for (int x = 0; x < src.BayerWidth; x++)
+			{
+				c[x]/=src.BayerHeight;
+			}
+			
+			
+			double ave = 0;
+            foreach (var i in c)
+				ave+=i;
+			ave/=(src.BayerWidth);
+
+
+			double dev = 0;
+            foreach (var i in c)
+				dev += (i - ave) * (i - ave);
+
+			dev = System.Math.Sqrt(dev / src.BayerWidth);
+
+            return dev;
+        }
+<# } #>
+    }
+}

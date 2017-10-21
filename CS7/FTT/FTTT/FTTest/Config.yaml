@@ -1,0 +1,122 @@
+﻿#
+# ファイル/フォルダ構成の記述
+#
+Regex         : "Lot(?<lot>[0-9]{4})\\\\wafer(?<wf>[0-9]{2})\\\\N(?<chip>[0-9]{2})"
+searchPattern : "N*"
+ChipNote      : "N[0-9]{2}_[a-zA-Z0-9]+_(?<note>[a-zA-Z0-9]+)$"
+Condition     :
+  Dark     : Dark
+  L10      : L10
+  L50      : L50
+  L90      : L90
+  L300     : L300
+  Dark4clk : DARK_TG4RCK
+  VNtest1 : LSB300_60FPS
+  VNtest2 : LSB600_60FPS
+  VNtest3 : LSB900_60FPS
+  VNtest4 : LSB1200_60FPS
+  VNtest5 : LSB1500_60FPS
+  VNtest6 : LSB1800_60FPS
+  VNtest7 : LSB2100_60FPS
+  VNtest8 : LSB3000_60FPS
+  VNtest9 : LSB4200_60FPS
+Picture :
+  Ave         : 
+    Name : ave.bin
+    Type : Single
+  Dev         : 
+    Name : dev.bin
+    Type : Single
+  Single      : 
+    Name : sgl.bin
+    Type : Int32
+  Ave-hob     : 
+    Name : ave_hob.bin
+    Type : Single
+  Dev-hob     : 
+    Name : dev_hob.bin
+    Type : Single
+  Single-hob  : 
+    Name : sgl_hob.bin
+    Type : Int32
+Maps :
+  Full : 
+    Left   : 0 
+    Top    : 0
+    Width  : 2256
+    Height : 1178
+  Normal : 
+    Left   : 149 
+    Top    : 39
+    Width  : 1956
+    Height : 1116
+  Effective : 
+    Left   : 153 
+    Top    : 43
+    Width  : 1948
+    Height : 1108
+  Active : 
+    Left   : 160 
+    Top    : 49
+    Width  : 1936
+    Height : 1096
+  ActiveStaggerL : 
+    Left   : 159 
+    Top    : 49
+    Width  : 1936
+    Height : 1096
+  Center : 
+    Left   : 223
+    Top    : 112
+    Width  : 1837
+    Height : 970
+  HOB-L : 
+    Left   : 12 
+    Top    : 49
+    Width  : 128
+    Height : 1096
+  HOB-R : 
+    Left   : 2116 
+    Top    : 49
+    Width  : 128
+    Height : 1096
+  HOB-Lx : 
+    Left   : 2 
+    Top    : 49
+    Width  : 8
+    Height : 1096
+  HOB-Rx : 
+    Left   : 2246 
+    Top    : 49
+    Width  : 8
+    Height : 1096
+  VOB-TL : 
+    Left   : 12 
+    Top    : 13
+    Width  : 128
+    Height : 16
+  VOB-TC : 
+    Left   : 160 
+    Top    : 13
+    Width  : 128
+    Height : 16
+  VOB-TR : 
+    Left   : 2116 
+    Top    : 13
+    Width  : 128
+    Height : 16
+  VOB-BL : 
+    Left   : 12 
+    Top    : 1168
+    Width  : 128
+    Height : 5
+  VOB-BC : 
+    Left   : 160 
+    Top    : 1168
+    Width  : 1936
+    Height : 5
+  VOB-BR : 
+    Left   : 2116 
+    Top    : 1168
+    Width  : 128
+    Height : 5			

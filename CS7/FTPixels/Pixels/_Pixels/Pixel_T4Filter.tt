@@ -1,0 +1,269 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ output extension=".cs" #>
+<#
+	Dictionary<String, String> Type = new Dictionary<String, String>();
+	Dictionary<String, String> Comment = new Dictionary<String, String>();
+	Dictionary<String, String> Op = new Dictionary<String, String>();	//演算子はキャスト必要な時
+	Dictionary<String, String> OpSign = new Dictionary<String, String>();	//演算子は符号
+	Dictionary<String, String> OpBit = new Dictionary<String, String>(); //演算子はビット演算
+
+	Type["PixelByte"]	= "byte";
+	Type["PixelUShort"]	= "ushort";
+	Type["PixelUInt"]	= "uint";
+	Type["PixelULong"]	= "ulong";
+	Type["PixelShort"]	= "short";
+	Type["PixelInt"]	= "int";
+	Type["PixelLong"]	= "long";
+	Type["PixelFloat"]	= "float";
+	Type["PixelDouble"]	= "double";
+
+	Comment["PixelByte"]	= "符号なし8ビット整数";
+	Comment["PixelUShort"]	= "符号なし16ビット整数";
+	Comment["PixelUInt"]	= "符号なし32ビット整数";
+	Comment["PixelULong"]	= "符号なし64ビット整数";
+	Comment["PixelShort"]	= "符号付き16ビット整数";
+	Comment["PixelInt"]	= "符号付き32ビット整数";
+	Comment["PixelLong"]	= "符号付き64ビット整数";
+	Comment["PixelFloat"]	= "単精度(32ビット)浮動小数点";
+	Comment["PixelDouble"]	= "単精度(64ビット)浮動小数点";
+
+	Op["PixelByte"]	= "PixelInt";
+	Op["PixelUShort"]	= "PixelInt";
+	Op["PixelUInt"]	= "PixelUInt";
+	Op["PixelULong"]	= "PixelULong";
+	Op["PixelShort"]	= "PixelInt";
+	Op["PixelInt"]	= "PixelInt";
+	Op["PixelLong"]	= "PixelLong";
+	Op["PixelFloat"]	= "PixelFloat";
+	Op["PixelDouble"]	= "PixelDouble";
+	
+	OpSign["PixelByte"]	= "PixelInt";
+	OpSign["PixelUShort"]	= "PixelInt";
+	OpSign["PixelUInt"]	= "PixelLong";
+	OpSign["PixelULong"]	= "PixelULong";
+	OpSign["PixelShort"]	= "PixelInt";
+	OpSign["PixelInt"]	= "PixelInt";
+	OpSign["PixelLong"]	= "PixelLong";
+	OpSign["PixelFloat"]	= "PixelFloat";
+	OpSign["PixelDouble"]	= "PixelDouble";
+
+	OpBit["PixelByte"]	= "PixelInt";
+	OpBit["PixelUShort"]	= "PixelInt";
+	OpBit["PixelUInt"]	= "PixelUInt";
+	OpBit["PixelULong"]	= "PixelULong";
+	OpBit["PixelShort"]	= "PixelInt";
+	OpBit["PixelInt"]	= "PixelInt";
+	OpBit["PixelLong"]	= "PixelLong";
+	OpBit["PixelFloat"]	= "PixelFloat";
+	OpBit["PixelDouble"]	= "PixelDouble";
+#>
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using System.Threading;
+
+using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Linq.Expressions;
+
+//.Net4.5以降
+#if !dNet3_5
+using System.Threading.Tasks;
+#endif
+
+/*******************************************************************************/
+/*   Pixels                                                                    */
+/*   2016/03/18                                                                */
+/*******************************************************************************/
+namespace Pixels
+{
+    /*--------------------------------------*/
+    //   画素操作
+    /*--------------------------------------*/
+	#region 画素操作
+<# foreach (var i in Type.Keys){ #>
+    public partial class <#= i #>
+    {
+		#region 深度
+		
+		/// <summary>
+        /// 型名にあった上限値, 下限値に丸める
+        /// </summary>
+        /// <param name="type">typeof(型名)</param>
+        /// <returns></returns>
+		public <#= i #> Limits(Type type) => (base.limits(type)).Create(Width, Height, base.token);
+		/// <summary>
+        /// 上限値, 下限値に丸める
+        /// </summary>
+        /// <param name="Upper">上限値</param>
+        /// <param name="Lower">下限値</param>
+        /// <returns></returns>
+		public <#= i #> Limits(<#= Type[i] #> Upper,<#= Type[i] #> Lower) => (base.limits(Upper, Lower)).Create(Width, Height, base.token);
+		/// <summary>
+        /// 下限値に丸める
+        /// </summary>
+        /// <param name="thr">閾値</param>
+        /// <returns></returns>
+        public <#= i #> LimitsLower(<#= Type[i] #> thr) => (base.limitsLower(thr)).Create(Width, Height, base.token);
+		/// <summary>
+        /// 上限値に丸める
+        /// </summary>
+        /// <param name="thr">閾値</param>
+        /// <returns></returns>
+        public <#= i #> LimitsUpper(<#= Type[i] #> thr) => (base.limitsUpper(thr)).Create(Width, Height, base.token);
+
+		#endregion
+		#region サイズ変更
+
+		/// <summary>
+        /// 画像をトリムする
+        /// </summary>
+        /// <param name="left">x原点</param>
+        /// <param name="top">y原点</param>
+        /// <param name="width">幅</param>
+        /// <param name="height">高さ</param>
+        /// <returns></returns>
+        public <#= i #> Trim(int left, int top, int width, int height) => (base.trim(left, top, width, height)).Create(width, height, base.token);
+		/// <summary>
+        /// 特定のベイヤを取り出す
+        /// </summary>
+        /// <param name="x">取り出しベイヤのx座標</param>
+        /// <param name="y">取り出しベイヤのy座標</param>
+        /// <param name="width">ベイヤの幅（省略時 = 2）</param>
+        /// <param name="height">ベイヤの幅（省略時 = 2）</param>
+        /// <returns></returns>
+        public <#= i #> TrimBayer(int x, int y,int width = 2,int height = 2) => (base.trimBayer(x, y, width , height)).Create(this.Width / width, this.Height / height, base.token);
+		
+		/// <summary>
+        /// 縦方向に交互に画素を挿入する
+        /// </summary>
+        /// <returns></returns>
+		public <#= i #> InsertRow(<#= i #> inPix) => (base.InsertRow(inPix.ToArray())).Create(Width, Height * 2, base.token);
+		/// <summary>
+        /// 横方向に交互に画素を挿入する
+        /// </summary>
+        /// <returns></returns>
+		public <#= i #> InsertCol(<#= i #> inPix) => (base.InsertCol(inPix.ToArray())).Create(Width * 2, Height, base.token);
+		/// <summary>
+        /// 4画素ベイヤーに並び替える
+        /// </summary>
+        /// <returns></returns>
+		public static <#= i #> InsertBayer(<#= i #> UpperLeft,<#= i #> UpperRight,<#= i #> LowerLeft, <#= i #> LowerRight) => (UpperLeft.InsertCol(UpperRight)).InsertRow(LowerLeft.InsertCol(LowerRight));
+
+		/// <summary>
+        /// 横に並べて画像を繋ぐ
+        /// </summary>
+        /// <returns></returns>
+		public static <#= i #> JoinH(<#= i #> left, <#= i #> right) => PixelBase<<#= Type[i] #>>.JoinHorizontal(left, right).Create(left.token);
+		/// <summary>
+        /// 縦に並べて画像を繋ぐ
+        /// </summary>
+        /// <returns></returns>
+		public static <#= i #> JoinV(<#= i #> top, <#= i #> bottom) => PixelBase<<#= Type[i] #>>.JoinVertical(top, bottom).Create(top.token);
+
+		#endregion
+
+
+		
+        /*--------------------------------------*/
+        //   フィルタ/畳み込み演算
+        /*--------------------------------------*/
+		#region エリア補間
+
+		/// <summary>
+        /// 周辺の補間をする（フィルタ使用時など）
+		/// V補間->H補間の順,（ストリーキング考慮）
+        /// </summary>
+        /// <returns></returns>
+		public <#= i #> Complement(int left, int right, int top, int bottom) => (base.complement(left, right, top, bottom)).Create(Width, Height, base.token);
+
+		#endregion
+		#region フィルタ/畳み込み演算
+		
+		/// <summary>
+        /// [フィルタ]メディアンフィルタ（境界処理無し）
+        /// </summary>
+        /// <param name="WindowX">convolution</param>
+        /// <param name="WindowY">convolution</param>
+        /// <param name="rank"></param>
+        /// <returns></returns>
+		public <#= i #> FilMed(int WindowX = 5, int WindowY = 5, int rank = 12) => FilterMedian(WindowX, WindowY, rank).Create(Width, Height, base.token);
+        /// <summary>
+        /// [フィルタ]アベレージフィルタ（境界処理無し）
+        /// </summary>
+        /// <param name="WindowX">convolution</param>
+        /// <param name="WindowY">convolution</param>
+        /// <returns></returns>
+		public <#= i #> FilAve(int WindowX = 5, int WindowY = 5) => FilterAverage(WindowX, WindowY, i => (<#= Type[i] #>)i).Create(Width, Height, base.token);
+ 
+		/// <summary>
+        /// [フィルタ]行方向プロファイル/列方向平均
+        /// </summary>
+        /// <returns></returns>
+ 		public <#= i #> FilRowProfileAve() => FilterAverage(1, Height, i => (<#= Type[i] #>)i).Create(Width, Height, base.token).Trim(0, Height / 2, Width,1);
+		
+		/// <summary>
+        /// [フィルタ]列方向プロファイル/行方向平均
+        /// </summary>
+        /// <returns></returns>
+        public <#= i #> FilColProfileAve() => FilterAverage(Width, 1, i => (<#= Type[i] #>)i).Create(Width, Height, base.token).Trim(Width/2, 0, 1, Height);
+
+		public <#= i #> FilRowProfileMed() => FilterMedian(1, Height, Height/2).Create(Width, Height, base.token).Trim(0, Height / 2, Width,1);
+        public <#= i #> FilColProfileMed() => FilterMedian(Width, 1, Width/2).Create(Width, Height, base.token).Trim(Width/2, 0, 1, Height);
+  
+		public <#= i #> FilRowProfileIGXL() 
+			=> FilMed(1, 63, 31).Trim(0, 31, Width, Height - 62).FilAve(1,Height - 62).Trim(0, (Height - 62)/2, Width, 1);
+        public <#= i #> FilColProfileIGXL()
+			=> FilMed(63, 1, 31).Trim(31, 0, Width - 62, Height).FilAve(Width - 62,1).Trim(0, (Width - 62)/2, 1, Height);
+
+		public <#= i #> FilWDPick(<#= Type[i] #> thr) => FilterWDPick(thr).Create(Width, Height, base.token);
+		
+		
+		/// <summary>
+        /// Windowに対してオフセット減算する
+        /// （ColProfileならばVOB補正）
+        /// </summary>
+        /// <param name="window"></param>
+        /// <returns></returns>
+		public <#= Op[i] #> OffsetCorrection(<#= i #> window)
+		{
+		    <#= Type[Op[i]] #>[] ret = new <#= Type[Op[i]] #>[Size];
+
+			int w = window.Width;
+			int h = window.Height;
+            Func<int,int,int> co = (x,y) =>
+            {
+				int xx = x % w;
+                int yy = y % h;
+                return xx + yy * w;
+            };
+
+            int c = 0;
+            for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
+				{
+                    ret[c] = (<#= Type[Op[i]] #>)(pixel[c] - window[co(x,y)]);
+					c++;
+				}
+
+            return ret.Create(Width, Height, base.token);		
+		}
+
+		/// <summary>
+        /// 奇数行（0開始）をshift画素ズラす
+        /// </summary>
+        /// <param name="shift"></param>
+        /// <returns></returns>
+		public <#= i #> Stagger(int shift = 1) => FilterStagger(shift).Create(Width, Height, base.token);
+
+		#endregion
+	}
+<# } #>
+	#endregion
+}

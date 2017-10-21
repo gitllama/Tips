@@ -1,0 +1,214 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ output extension=".cs" #>
+<#
+	var Type = new Dictionary<string, string>();
+	var Comment = new Dictionary<string, string>();
+	var Op = new Dictionary<string, string>();	//演算子はキャスト必要な時
+	var OpSign = new Dictionary<string, string>();	//演算子は符号
+	var OpBit = new Dictionary<string, string>(); //演算子はビット演算
+	var Size = new Dictionary<string, int>();
+	var ForByte = new Dictionary<string, string>();
+
+	Type["PixelByte"]	= "byte";
+	Type["PixelUShort"]	= "ushort";
+	Type["PixelUInt"]	= "uint";
+	Type["PixelULong"]	= "ulong";
+	Type["PixelShort"]	= "short";
+	Type["PixelInt"]	= "int";
+	Type["PixelLong"]	= "long";
+	Type["PixelFloat"]	= "float";
+	Type["PixelDouble"]	= "double";
+
+	Comment["PixelByte"]	= "符号なし8ビット整数";
+	Comment["PixelUShort"]	= "符号なし16ビット整数";
+	Comment["PixelUInt"]	= "符号なし32ビット整数";
+	Comment["PixelULong"]	= "符号なし64ビット整数";
+	Comment["PixelShort"]	= "符号付き16ビット整数";
+	Comment["PixelInt"]	= "符号付き32ビット整数";
+	Comment["PixelLong"]	= "符号付き64ビット整数";
+	Comment["PixelFloat"]	= "単精度(32ビット)浮動小数点";
+	Comment["PixelDouble"]	= "単精度(64ビット)浮動小数点";
+
+	Op["PixelByte"]	= "PixelInt";
+	Op["PixelUShort"]	= "PixelInt";
+	Op["PixelUInt"]	= "PixelUInt";
+	Op["PixelULong"]	= "PixelULong";
+	Op["PixelShort"]	= "PixelInt";
+	Op["PixelInt"]	= "PixelInt";
+	Op["PixelLong"]	= "PixelLong";
+	Op["PixelFloat"]	= "PixelFloat";
+	Op["PixelDouble"]	= "PixelDouble";
+	
+	OpSign["PixelByte"]	= "PixelInt";
+	OpSign["PixelUShort"]	= "PixelInt";
+	OpSign["PixelUInt"]	= "PixelLong";
+	OpSign["PixelULong"]	= "PixelULong";
+	OpSign["PixelShort"]	= "PixelInt";
+	OpSign["PixelInt"]	= "PixelInt";
+	OpSign["PixelLong"]	= "PixelLong";
+	OpSign["PixelFloat"]	= "PixelFloat";
+	OpSign["PixelDouble"]	= "PixelDouble";
+
+	OpBit["PixelByte"]	= "PixelInt";
+	OpBit["PixelUShort"]	= "PixelInt";
+	OpBit["PixelUInt"]	= "PixelUInt";
+	OpBit["PixelULong"]	= "PixelULong";
+	OpBit["PixelShort"]	= "PixelInt";
+	OpBit["PixelInt"]	= "PixelInt";
+	OpBit["PixelLong"]	= "PixelLong";
+	OpBit["PixelFloat"]	= "PixelFloat";
+	OpBit["PixelDouble"]	= "PixelDouble";
+
+	Size["PixelByte"]	= 1;
+	Size["PixelUShort"]	= 2;
+	Size["PixelUInt"]	= 4;
+	Size["PixelULong"]	= 8;
+	Size["PixelShort"]	= 2;
+	Size["PixelInt"]	= 4;
+	Size["PixelLong"]	= 8;
+	Size["PixelFloat"]	= 4;
+	Size["PixelDouble"]	= 8;
+
+	ForByte["PixelByte"]	= "";
+	ForByte["PixelUShort"]	= "ToUInt16";
+	ForByte["PixelUInt"]	= "ToUInt32";
+	ForByte["PixelULong"]	= "ToUInt64";
+	ForByte["PixelShort"]	= "ToInt16";
+	ForByte["PixelInt"]		= "ToInt32";
+	ForByte["PixelLong"]	= "ToInt64";
+	ForByte["PixelFloat"]	= "ToSingle";
+	ForByte["PixelDouble"]	= "ToDouble";
+#>
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Threading;
+
+using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Linq.Expressions;
+
+//.Net4.5以降
+#if !dNet3_5
+using System.Threading.Tasks;
+using System.IO.Compression;
+
+/*******************************************************************************/
+/*   Pixels                                                                    */
+/*   2016/03/23                                                                */
+/*******************************************************************************/
+namespace Pixels.Zipper
+{
+	/*--------------------------------------*/
+    //   Zipperなラッパー
+    /*--------------------------------------*/
+    #region 読み書きZip
+    public unsafe static partial class PixelStreamZipper
+    {
+	    #region Reader
+
+        public static dynamic ReadZipPixel(string zipfilename, string statusname = "000")
+        {
+			var sta = XML.ReadZipStatus(zipfilename, statusname);
+
+			switch(sta.type)
+			{
+<# foreach (var j in Type.Keys){ #>
+				case "<#= Type[j] #>":
+					using (var archive = ZipFile.Open(zipfilename, ZipArchiveMode.Read))
+					using (var reader = archive.GetEntry(sta.filename).Open())
+						return PixelStream.ReadBinTo<#= j #>(reader, sta.Width, sta.Height, sta.offset);
+<# } #>
+				default:
+					return null;
+			}
+        }
+
+<# foreach (var i in Type.Keys){ #>
+		public static <#= i #> ReadZip<#= i #>(string zipfilename, string statusname = "000")
+		{
+			var sta = XML.ReadZipStatus(zipfilename, statusname);
+
+			<#= Type[i] #>[] buf = new <#= Type[i] #>[sta.Width * sta.Height];
+
+			switch(sta.type)
+			{
+<# foreach (var j in Type.Keys){ #>
+				case "<#= Type[j] #>":
+					using (var archive = ZipFile.Open(zipfilename, ZipArchiveMode.Read))
+					using (var reader = archive.GetEntry(sta.filename).Open())
+						return (<#= i #>)PixelStream.ReadBinTo<#= j #>(reader, sta.Width, sta.Height, sta.offset);
+<# } #>
+				default:
+					return null;
+			}
+		}
+ <# } #>
+		#endregion
+        #region Writer
+<# foreach (var i in Type.Keys){ #>
+        public static void WriteZipTxt(this <#= i #> p, string zipfilename, string statusname = "000", bool append = false, CompressionLevel level = CompressionLevel.Fastest)
+        {
+			var sta = new StaPara();
+            sta.Width = p.Width;
+            sta.Height = p.Height;
+            sta.filename = statusname + ".txt";
+			sta.type = "txt";
+
+			ZipArchiveMode mode = append ? ZipArchiveMode.Update : ZipArchiveMode.Create;
+
+            using (var archive = ZipFile.Open(zipfilename, mode))
+            {
+                using (var z = archive.CreateEntry(statusname + ext_status, level).Open())
+                    WriteStatus(z, sta);
+                using (var z = archive.CreateEntry(sta.filename).Open())
+					PixelStream.WriteTxt(z, p);
+            }
+        }
+<# } #>
+<# foreach (var i in Type.Keys){ #>
+		public static void WriteZip(this <#= i #> p, string zipfilename, string statusname = "000", bool append = false, CompressionLevel level = CompressionLevel.Fastest)
+        {
+            XML.PixelModelDependent.ModelDataXML buf = new XML.PixelModelDependent.ModelDataXML(); 
+
+            buf.Width = p.Width;
+            buf.Height = p.Height;
+            buf.FileName = new List<string>{ $"^{statusname}.bin$" };
+            buf.FileSize = -1;
+            buf.SetFileType(typeof(<#= i #>));
+            //buf.SetFileType(p.GetType());
+
+            ZipArchiveMode mode = append ? ZipArchiveMode.Update : ZipArchiveMode.Create;
+
+            using (var archive = ZipFile.Open(zipfilename, mode))
+            {
+                using (var z = archive.CreateEntry($"PixelsModel\\{statusname}.model", level).Open())
+                {
+                    Pixels.IO.XMLSetter.Write<PixelModelDependent.ModelDataXML>(buf, z);
+                }
+                using (var z = archive.CreateEntry($"{statusname}.bin").Open())
+                {
+                    PixelStream.WriteBin(z, p);
+                }
+
+            }
+        }
+<# } #>
+        #endregion
+	}
+
+    #endregion
+
+}
+
+#endif

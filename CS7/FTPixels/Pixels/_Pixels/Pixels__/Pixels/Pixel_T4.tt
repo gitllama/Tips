@@ -1,0 +1,745 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ output extension=".cs" #>
+<#
+	Dictionary<String, String> Type = new Dictionary<String, String>();
+	Dictionary<String, String> Comment = new Dictionary<String, String>();
+	Dictionary<String, String> Op = new Dictionary<String, String>();	//演算子はキャスト必要な時
+	Dictionary<String, String> OpSign = new Dictionary<String, String>();	//演算子は符号
+	Dictionary<String, String> OpBit = new Dictionary<String, String>(); //演算子はビット演算
+
+	Type["PixelByte"]	= "byte";
+	Type["PixelUShort"]	= "ushort";
+	Type["PixelUInt"]	= "uint";
+	Type["PixelULong"]	= "ulong";
+	Type["PixelShort"]	= "short";
+	Type["PixelInt"]	= "int";
+	Type["PixelLong"]	= "long";
+	Type["PixelFloat"]	= "float";
+	Type["PixelDouble"]	= "double";
+
+	Comment["PixelByte"]	= "符号なし8ビット整数";
+	Comment["PixelUShort"]	= "符号なし16ビット整数";
+	Comment["PixelUInt"]	= "符号なし32ビット整数";
+	Comment["PixelULong"]	= "符号なし64ビット整数";
+	Comment["PixelShort"]	= "符号付き16ビット整数";
+	Comment["PixelInt"]	= "符号付き32ビット整数";
+	Comment["PixelLong"]	= "符号付き64ビット整数";
+	Comment["PixelFloat"]	= "単精度(32ビット)浮動小数点";
+	Comment["PixelDouble"]	= "単精度(64ビット)浮動小数点";
+
+	Op["PixelByte"]	= "PixelInt";
+	Op["PixelUShort"]	= "PixelInt";
+	Op["PixelUInt"]	= "PixelUInt";
+	Op["PixelULong"]	= "PixelULong";
+	Op["PixelShort"]	= "PixelInt";
+	Op["PixelInt"]	= "PixelInt";
+	Op["PixelLong"]	= "PixelLong";
+	Op["PixelFloat"]	= "PixelFloat";
+	Op["PixelDouble"]	= "PixelDouble";
+	
+	OpSign["PixelByte"]	= "PixelInt";
+	OpSign["PixelUShort"]	= "PixelInt";
+	OpSign["PixelUInt"]	= "PixelLong";
+	OpSign["PixelULong"]	= "PixelULong";
+	OpSign["PixelShort"]	= "PixelInt";
+	OpSign["PixelInt"]	= "PixelInt";
+	OpSign["PixelLong"]	= "PixelLong";
+	OpSign["PixelFloat"]	= "PixelFloat";
+	OpSign["PixelDouble"]	= "PixelDouble";
+
+	OpBit["PixelByte"]	= "PixelInt";
+	OpBit["PixelUShort"]	= "PixelInt";
+	OpBit["PixelUInt"]	= "PixelUInt";
+	OpBit["PixelULong"]	= "PixelULong";
+	OpBit["PixelShort"]	= "PixelInt";
+	OpBit["PixelInt"]	= "PixelInt";
+	OpBit["PixelLong"]	= "PixelLong";
+	OpBit["PixelFloat"]	= "PixelFloat";
+	OpBit["PixelDouble"]	= "PixelDouble";
+#>
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Threading;
+
+using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Linq.Expressions;
+
+using System.IO.Compression;
+using System.Threading.Tasks;
+
+
+/*******************************************************************************/
+/*   Pixels                                                                    */
+/*   2015/09/07                                                                */
+/*******************************************************************************/
+namespace Pixels
+{
+    /*--------------------------------------*/
+    //   コンストラクタ/プロパティ・インデクサ 
+    /*--------------------------------------*/
+	#region コンストラクタ
+<# foreach (var cls in Type.Keys){ #>
+    /// <summary>
+    /// <#= Comment[cls] #>Pixelクラス
+    /// </summary>
+    public partial class <#= cls #> : PixelBase<<#= Type[cls] #>>
+    {
+		protected <#= cls #>(int Width, int Height) : base(Width, Height) { }
+		public <#= cls #>(<#= Type[cls] #>[] buf, int Width, int Height) : base(buf, Width, Height) { }
+		public <#= cls #>(<#= Type[cls] #>[] buf, int Width, int Height, CancellationTokenSource tok) : base(buf, Width, Height, tok) { }
+		public int bytesize{ get { return sizeof(<#= Type[cls] #>); }  }
+	}
+<# } #>
+    /// <summary>
+    /// Pixelクラス拡張メソッド
+    /// </summary>
+    public static class PixelExtensions
+    {
+<# foreach (var cls in Type.Keys){ #>
+		public static <#= cls #> Create(this <#= Type[cls] #>[] buf, int w, int h, CancellationTokenSource token) { return new <#= cls #>(buf, w, h, token); }
+<# } #>
+
+<# foreach (var cls in Type.Keys){ #>
+		public static <#= cls #> Create(this PArray<<#= Type[cls] #>> buf, CancellationTokenSource token){ return new <#= cls #>(buf.p, buf.w, buf.h, token);}
+<# } #>
+	}
+	#endregion
+    /*--------------------------------------*/
+    //   operator
+    /*--------------------------------------*/
+	#region operator
+<# foreach (var cls in Type.Keys){ #>
+    public partial class <#= cls #>
+    {
+		#region operator 四則演算
+        public unsafe static <#= Op[cls] #> operator +(<#= cls #> x, <#= cls #> y)
+		{
+			if (x.Size != y.Size) throw new ArgumentOutOfRangeException("operator Array Size");
+			
+			int size = x.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+			fixed (<#= Type[cls] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>*	pt_x = p_x;
+				<#= Type[cls] #>*	pt_y = p_y;
+                <#= Type[Op[cls]] #>*	pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ + *pt_y++;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+		public unsafe static <#= Op[cls] #> operator -(<#= cls #> x, <#= cls #> y)
+		{
+			if (x.Size != y.Size) throw new ArgumentOutOfRangeException("operator Array Size");
+			
+			int size = x.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+			fixed (<#= Type[cls] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>*	pt_x = p_x;
+				<#= Type[cls] #>*	pt_y = p_y;
+                <#= Type[Op[cls]] #>*	pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ - *pt_y++;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+		public unsafe static <#= Op[cls] #> operator *(<#= cls #> x, <#= cls #> y)
+		{
+			if (x.Size != y.Size) throw new ArgumentOutOfRangeException("operator Array Size");
+			
+			int size = x.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+			fixed (<#= Type[cls] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>*	pt_x = p_x;
+				<#= Type[cls] #>*	pt_y = p_y;
+                <#= Type[Op[cls]] #>*	pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ * *pt_y++;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+			}
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+		public unsafe static <#= Op[cls] #> operator /(<#= cls #> x, <#= cls #> y)
+		{
+			if (x.Size != y.Size) throw new ArgumentOutOfRangeException("operator Array Size");
+			
+			int size = x.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+			fixed (<#= Type[cls] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>*	pt_x = p_x;
+				<#= Type[cls] #>*	pt_y = p_y;
+                <#= Type[Op[cls]] #>*	pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ / *pt_y++;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+        public unsafe static <#= Op[cls] #> operator +(<#= cls #> x, <#= Type[cls] #> y)
+		{
+			int size = x.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_x = p_x;
+                <#= Type[Op[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ + y;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+        }
+        public unsafe static <#= Op[cls] #> operator -(<#= cls #> x, <#= Type[cls] #> y)
+		{
+			int size = x.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_x = p_x;
+                <#= Type[Op[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ - y;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+        }
+		public unsafe static <#= Op[cls] #> operator *(<#= cls #> x, <#= Type[cls] #> y)
+		{
+			int size = x.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_x = p_x;
+                <#= Type[Op[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ * y;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+        }
+		public unsafe static <#= Op[cls] #> operator /(<#= cls #> x, <#= Type[cls] #> y)
+		{
+			int size = x.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_x = p_x;
+                <#= Type[Op[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ / y;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+        }
+		public unsafe static <#= Op[cls] #> operator +(<#= Type[cls] #> x, <#= cls #> y)
+		{
+			int size = y.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_y = p_y;
+                <#= Type[Op[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = x + *pt_y++;
+					y.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(y.Width, y.Height, y.token);
+        }
+		public unsafe static <#= Op[cls] #> operator -(<#= Type[cls] #> x, <#= cls #> y)
+		{
+			int size = y.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_y = p_y;
+                <#= Type[Op[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = x - *pt_y++;
+					y.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(y.Width, y.Height, y.token);
+        }
+		public unsafe static <#= Op[cls] #> operator *(<#= Type[cls] #> x, <#= cls #> y)
+		{
+			int size = y.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_y = p_y;
+                <#= Type[Op[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = x * *pt_y++;
+					y.token.Token.ThrowIfCancellationRequested();
+				}
+			}
+            return ret.Create(y.Width, y.Height, y.token);
+        }
+		public unsafe static <#= Op[cls] #> operator /(<#= Type[cls] #> x, <#= cls #> y)
+		{
+			int size = y.Size;
+			<#= Type[Op[cls]] #>[] ret = new <#= Type[Op[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[Op[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_y = p_y;
+                <#= Type[Op[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = x / *pt_y++;
+					y.token.Token.ThrowIfCancellationRequested();
+				}
+			}
+            return ret.Create(y.Width, y.Height, y.token);
+        }
+		public static <#= cls #> operator +(<#= cls #> x) => x;
+        <#= (cls == "PixelULong") ? @"//" : ""#>public unsafe static <#= OpSign[cls] #> operator -(<#= cls #> x)
+		<#= (cls == "PixelULong") ? @"//" : ""#>{
+		<#= (cls == "PixelULong") ? @"//" : ""#>	int size = x.Size;
+		<#= (cls == "PixelULong") ? @"//" : ""#>	<#= Type[OpSign[cls]] #>[] ret = new <#= Type[OpSign[cls]] #>[size];
+		<#= (cls == "PixelULong") ? @"//" : ""#>
+        <#= (cls == "PixelULong") ? @"//" : ""#>    fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+        <#= (cls == "PixelULong") ? @"//" : ""#>    fixed (<#= Type[OpSign[cls]] #>* p_ret = &ret[0])
+        <#= (cls == "PixelULong") ? @"//" : ""#>    {
+        <#= (cls == "PixelULong") ? @"//" : ""#>        <#= Type[cls] #>* pt_x = p_x;
+        <#= (cls == "PixelULong") ? @"//" : ""#>        <#= Type[OpSign[cls]] #>* pt_ret = p_ret;
+		<#= (cls == "PixelULong") ? @"//" : ""#>
+        <#= (cls == "PixelULong") ? @"//" : ""#>        for (int i = 0; i < size; ++i)
+        <#= (cls == "PixelULong") ? @"//" : ""#>        {
+        <#= (cls == "PixelULong") ? @"//" : ""#>            *pt_ret++ = *pt_x++ * -1;
+        <#= (cls == "PixelULong") ? @"//" : ""#>			x.token.Token.ThrowIfCancellationRequested();
+        <#= (cls == "PixelULong") ? @"//" : ""#>        }
+        <#= (cls == "PixelULong") ? @"//" : ""#>    }
+        <#= (cls == "PixelULong") ? @"//" : ""#>    return ret.Create(x.Width, x.Height, x.token);
+        <#= (cls == "PixelULong") ? @"//" : ""#>}
+		#endregion
+		#region operator キャスト
+<# foreach (var cls2 in Type.Keys){ #>
+		<#= (cls == cls2) ? @"//" : "" #>public static <#= castchk(Type[cls],Type[cls2]) #> operator <#= cls2 #>(<#= cls #> x) => x.To<#= cls2 #>();
+<# } //cls2 #>
+<# foreach (var cls2 in Type.Keys){ #>
+		/// <summary>
+        /// <#= Comment[cls2] #>へキャストを行う（値チェックなし）
+        /// </summary>
+        /// <returns></returns>
+		public unsafe <#= cls2 #> To<#= cls2 #>()
+		{
+			int size = this.Size;
+			<#= Type[cls2] #>[] ret = new <#= Type[cls2] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &this.pixel[0])
+            fixed (<#= Type[cls2] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_x = p_x;
+                <#= Type[cls2] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = (<#= Type[cls2] #>)*pt_x++;
+					this.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(this.Width, this.Height, token);
+        }
+<# } //cls2 #>
+		#endregion
+		#region operator ビット演算
+		<#= (OpBit[cls] == "PixelFloat" || OpBit[cls] == "PixelDouble") ? @"/*" : ""#>
+		public unsafe static <#= OpBit[cls] #> operator <<(<#= cls #> x, int y)
+		{
+			//論理シフト（最下位0埋め
+			int size = x.Size;
+			<#= Type[OpBit[cls]] #>[] ret = new <#= Type[OpBit[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+            fixed (<#= Type[OpBit[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_x = p_x;
+                <#= Type[OpBit[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ << y;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+        public unsafe static <#= OpBit[cls] #> operator >>(<#= cls #> x, int y)
+		{
+			//算術シフト（符号ビットで埋める）符号無しなら論理シフト
+			int size = x.Size;
+			<#= Type[OpBit[cls]] #>[] ret = new <#= Type[OpBit[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+            fixed (<#= Type[OpBit[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_x = p_x;
+                <#= Type[OpBit[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ >> y;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+        public unsafe static <#= OpBit[cls] #> operator &(<#= cls #> x, <#= cls #> y)
+		{
+			if (x.Size != y.Size) throw new ArgumentOutOfRangeException("operator Array Size");
+			
+			int size = x.Size;
+			<#= Type[OpBit[cls]] #>[] ret = new <#= Type[OpBit[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+			fixed (<#= Type[cls] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[OpBit[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>*	pt_x = p_x;
+				<#= Type[cls] #>*	pt_y = p_y;
+                <#= Type[OpBit[cls]] #>*	pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ & *pt_y++;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+        public unsafe static <#= OpBit[cls] #> operator ^(<#= cls #> x, <#= cls #> y)
+		{
+			if (x.Size != y.Size) throw new ArgumentOutOfRangeException("operator Array Size");
+			
+			int size = x.Size;
+			<#= Type[OpBit[cls]] #>[] ret = new <#= Type[OpBit[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+			fixed (<#= Type[cls] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[OpBit[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>*	pt_x = p_x;
+				<#= Type[cls] #>*	pt_y = p_y;
+                <#= Type[OpBit[cls]] #>*	pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ ^ *pt_y++;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+        public unsafe static <#= OpBit[cls] #> operator |(<#= cls #> x, <#= cls #> y)
+		{
+			if (x.Size != y.Size) throw new ArgumentOutOfRangeException("operator Array Size");
+			
+			int size = x.Size;
+			<#= Type[OpBit[cls]] #>[] ret = new <#= Type[OpBit[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+			fixed (<#= Type[cls] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[OpBit[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>*	pt_x = p_x;
+				<#= Type[cls] #>*	pt_y = p_y;
+                <#= Type[OpBit[cls]] #>*	pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ | *pt_y++;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+        public unsafe static <#= OpBit[cls] #> operator &(<#= cls #> x, <#= Type[cls] #> y)
+		{
+			int size = x.Size;
+			<#= Type[OpBit[cls]] #>[] ret = new <#= Type[OpBit[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+            fixed (<#= Type[OpBit[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_x = p_x;
+                <#= Type[OpBit[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ & y;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+        public unsafe static <#= OpBit[cls] #> operator ^(<#= cls #> x, <#= Type[cls] #> y)
+		{
+			int size = x.Size;
+			<#= Type[OpBit[cls]] #>[] ret = new <#= Type[OpBit[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+            fixed (<#= Type[OpBit[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_x = p_x;
+                <#= Type[OpBit[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ ^ y;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+        public unsafe static <#= OpBit[cls] #> operator |(<#= cls #> x, <#= Type[cls] #> y)
+		{
+			int size = x.Size;
+			<#= Type[OpBit[cls]] #>[] ret = new <#= Type[OpBit[cls]] #>[size];
+
+            fixed (<#= Type[cls] #>* p_x = &x.pixel[0])
+            fixed (<#= Type[OpBit[cls]] #>* p_ret = &ret[0])
+            {
+                <#= Type[cls] #>* pt_x = p_x;
+                <#= Type[OpBit[cls]] #>* pt_ret = p_ret;
+
+                for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ | y;
+					x.token.Token.ThrowIfCancellationRequested();
+				}
+            }
+            return ret.Create(x.Width, x.Height, x.token);
+		}
+        public static <#= OpBit[cls] #> operator &(<#= Type[cls] #> x, <#= cls #> y) => y & x;
+        public static <#= OpBit[cls] #> operator ^(<#= Type[cls] #> x, <#= cls #> y) => y ^ x;
+        public static <#= OpBit[cls] #> operator |(<#= Type[cls] #> x, <#= cls #> y) => y | x;
+		<#= (OpBit[cls] == "PixelFloat" || OpBit[cls] == "PixelDouble") ? @"*/" : ""#>
+		#endregion
+	}
+<# } //cls #>
+	#endregion
+
+    /*--------------------------------------*/
+    //   PixelMath
+    /*--------------------------------------*/
+	#region PixelMath
+    public static class PixelMath
+    {
+<# foreach (var cls in Type.Keys){ #>
+        /// <summary>
+        /// <#= Comment[cls] #>Pixelの平方根を求める
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns><#= Comment["PixelDouble"] #>Pixel</returns>
+		public unsafe static PixelDouble Sqrt(<#= cls #> value)
+        {
+			int s = value.Size;
+            double[] ret = new double[s];
+            for (int i = 0; i < s; i++)
+			{
+                ret[i] = Math.Sqrt(value[i]);
+				value.token.Token.ThrowIfCancellationRequested();
+			}
+            return ret.Create(value.Width, value.Height, value.token);
+        }
+<# } #>
+
+<# foreach (var cls in Type.Keys){ #>
+        /// <summary>
+        /// <#= Comment[cls] #>Pixelの平方根を求める
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns><#= Comment["PixelFloat"] #>Pixel</returns>
+		public static PixelFloat SqrtSingle(<#= cls #> value)
+        {
+			int s = value.Size;
+            float[] ret = new float[s];
+            for (int i = 0; i < s; i++)
+			{
+                ret[i] = (float)Math.Sqrt(value[i]);
+				value.token.Token.ThrowIfCancellationRequested();
+			}
+            return ret.Create(value.Width, value.Height, value.token);
+        }
+<# } #>
+
+<# foreach (var cls in new string[]{"PixelDouble","PixelFloat","PixelLong","PixelInt","PixelShort"}){ #>
+        /// <summary>
+        /// <#= Comment[cls] #>Pixelの絶対値を求める
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+		public static <#= cls #> Abs(<#= cls #> value)
+        {
+			int s = value.Size;
+            <#= Type[cls] #>[] ret = new <#= Type[cls] #>[s];
+            for (int i = 0; i < s; i++)
+			{
+                ret[i] = Math.Abs(value[i]);
+				value.token.Token.ThrowIfCancellationRequested();
+			}
+			return ret.Create(value.Width, value.Height, value.token);
+        }
+<# } #>
+
+<# foreach (var cls in new string[]{"PixelDouble","PixelFloat"}){ #>
+        /// <summary>
+        /// <#= Comment[cls] #>Pixelのべき乗を求める
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns><#= Comment["PixelDouble"] #>Pixel</returns>
+		public static <#= cls #> Pow(<#= cls #> x,<#= Type[cls] #> y)
+        {
+			int s = x.Size;
+            <#= Type[cls] #>[] ret = new <#= Type[cls] #>[s];
+            for (int i = 0; i < s; i++)
+			{
+                ret[i] = (<#= Type[cls] #>)Math.Pow(x[i],y);
+				x.token.Token.ThrowIfCancellationRequested();
+			}
+            return ret.Create(x.Width, x.Height, x.token);
+        }
+<# } #>
+            //Math.Exp
+            //Math.Log
+            //Math.Log10
+
+
+
+	}
+	#endregion
+}
+
+
+
+
+
+
+
+<#+
+/*メソッド-------------------------------------------------------------------*/
+//キャストの明示
+private string castchk(string input,string output)
+{
+	List<string> cast_sbyte	= new List<string>(){"short", "int", "long", "float", "double", "decimal"};
+	List<string> cast_byte	= new List<string>(){"short", "ushort", "int", "uint", "long", "ulong", "float", "double", "decimal"};
+	List<string> cast_short	= new List<string>(){"int", "long", "float", "double", "decimal"};
+	List<string> cast_ushort = new List<string>(){"int", "uint", "long", "ulong", "float", "double", "decimal"};
+	List<string> cast_int = new List<string>(){"long", "float", "double", "decimal"};
+	List<string> cast_uint = new List<string>(){"long", "ulong", "float", "double", "decimal"};
+	List<string> cast_long = new List<string>(){"float", "double", "decimal"};
+	List<string> cast_ulong = new List<string>(){"float", "double", "decimal"};
+	List<string> cast_char = new List<string>(){"ushort", "int", "uint", "long", "ulong", "float", "double", "decimal"};
+	List<string> cast_float = new List<string>(){"double"};
+
+	switch(input)
+	{
+		case "sbyte":
+			return cast_sbyte.Contains(output) ? "implicit" : "explicit";
+		case "byte":
+			return cast_byte.Contains(output) ? "implicit" : "explicit";
+		case "short":
+			return cast_short.Contains(output) ? "implicit" : "explicit";
+		case "int":
+			return cast_int.Contains(output) ? "implicit" : "explicit";
+		case "uint":
+			return cast_uint.Contains(output) ? "implicit" : "explicit";
+		case "long":
+			return cast_long.Contains(output) ? "implicit" : "explicit";
+		case "ulong":
+			return cast_ulong.Contains(output) ? "implicit" : "explicit";
+		case "char":
+			return cast_char.Contains(output) ? "implicit" : "explicit";
+		case "float":
+			return cast_float.Contains(output) ? "implicit" : "explicit";
+		default:
+			return "explicit";
+	}
+}
+private string castchk2(string input,string output)
+{
+	return castchk(input, output) == "explicit" ? "("+output+")" : "";
+}
+
+/*メソッド-------------------------------------------------------------------*/
+
+
+
+#>

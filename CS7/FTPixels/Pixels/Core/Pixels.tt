@@ -1,0 +1,264 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ output extension=".cs" #>
+
+<#
+	Dictionary<String, String> Type = new Dictionary<String, String>();
+	Dictionary<String, String> Comment = new Dictionary<String, String>();
+	Dictionary<String, String> Op = new Dictionary<String, String>();	//演算子はキャスト必要な時
+	Dictionary<String, String> OpSign = new Dictionary<String, String>();	//演算子は符号
+	Dictionary<String, String> OpBit = new Dictionary<String, String>(); //演算子はビット演算
+
+	Type["PixelByte"]	= "byte";
+	Type["PixelUShort"]	= "ushort";
+	Type["PixelUInt"]	= "uint";
+	Type["PixelULong"]	= "ulong";
+	Type["PixelShort"]	= "short";
+	Type["PixelInt"]	= "int";
+	Type["PixelLong"]	= "long";
+	Type["PixelFloat"]	= "float";
+	Type["PixelDouble"]	= "double";
+
+	Comment["PixelByte"]	= "符号なし8ビット整数";
+	Comment["PixelUShort"]	= "符号なし16ビット整数";
+	Comment["PixelUInt"]	= "符号なし32ビット整数";
+	Comment["PixelULong"]	= "符号なし64ビット整数";
+	Comment["PixelShort"]	= "符号付き16ビット整数";
+	Comment["PixelInt"]	= "符号付き32ビット整数";
+	Comment["PixelLong"]	= "符号付き64ビット整数";
+	Comment["PixelFloat"]	= "単精度(32ビット)浮動小数点";
+	Comment["PixelDouble"]	= "単精度(64ビット)浮動小数点";
+
+	Op["PixelByte"]	= "PixelInt";
+	Op["PixelUShort"]	= "PixelInt";
+	Op["PixelUInt"]	= "PixelUInt";
+	Op["PixelULong"]	= "PixelULong";
+	Op["PixelShort"]	= "PixelInt";
+	Op["PixelInt"]	= "PixelInt";
+	Op["PixelLong"]	= "PixelLong";
+	Op["PixelFloat"]	= "PixelFloat";
+	Op["PixelDouble"]	= "PixelDouble";
+	
+	OpSign["PixelByte"]	= "PixelInt";
+	OpSign["PixelUShort"]	= "PixelInt";
+	OpSign["PixelUInt"]	= "PixelLong";
+	OpSign["PixelULong"]	= "PixelULong";
+	OpSign["PixelShort"]	= "PixelInt";
+	OpSign["PixelInt"]	= "PixelInt";
+	OpSign["PixelLong"]	= "PixelLong";
+	OpSign["PixelFloat"]	= "PixelFloat";
+	OpSign["PixelDouble"]	= "PixelDouble";
+
+	OpBit["PixelByte"]	= "PixelInt";
+	OpBit["PixelUShort"]	= "PixelInt";
+	OpBit["PixelUInt"]	= "PixelUInt";
+	OpBit["PixelULong"]	= "PixelULong";
+	OpBit["PixelShort"]	= "PixelInt";
+	OpBit["PixelInt"]	= "PixelInt";
+	OpBit["PixelLong"]	= "PixelLong";
+	OpBit["PixelFloat"]	= "PixelFloat";
+	OpBit["PixelDouble"]	= "PixelDouble";
+#>
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Drawing;
+//using System.Drawing.Imaging;
+using System.Threading;
+
+using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Linq.Expressions;
+
+using System.IO.Compression;
+using System.Threading.Tasks;
+
+/*******************************************************************************/
+/*   Pixels 3.0                                                                */
+/*   2016/11/15                                                                */
+/*******************************************************************************/
+namespace Pixels
+{
+<# foreach (var T in Type.Keys){ #>
+
+    /// <summary>
+    /// <#= Comment[T] #>Pixelクラス
+    /// </summary>
+    public partial class <#= T #>
+    {
+		public CancellationTokenSource token;
+		protected <#= Type[T] #>[] pixel;
+
+		public int Width { get; protected set; }    //幅
+        public int Height { get; protected set; }   //高さ
+        public int Size { get; protected set; }     //サイズ
+
+		/// <summary>
+        /// 一次元画素配列を取得する
+        /// </summary>
+        /// <returns></returns>
+		public <#= Type[T] #>[] ToArray() => pixel;
+
+		public <#= Type[T] #> this[int x]
+        {
+            protected set { pixel[x] = value; }
+            get { return this.pixel[x]; }
+        }
+
+		public <#= Type[T] #> this[int x, int y]
+        {
+            protected set { pixel[x + y * this.Width] = value; }
+            get { return this.pixel[x + y * this.Width]; }
+        }
+
+
+		/* -------------------------------------- */
+
+
+		public <#= T #>(<#= Type[T] #>[] buf, int Width, int Height, CancellationTokenSource tok)
+        {
+            this.Width = Width;
+            this.Height = Height;
+            this.Size = Width * Height;
+
+            if (buf.Length != Size) throw new ArgumentOutOfRangeException("new");
+            if (int.MaxValue <= Size) throw new OverflowException("Over MaxValue of int");
+
+            this.pixel = buf;//参照コピー（コンストラクタ呼び出し時は値コピー
+			token = tok;
+
+            //this.pixel = new double[Size]; <-いらんかったんや
+            //buf.CopyTo(pixel, 0);//値コピー
+            //initmemo();
+        }
+
+        public <#= T #>(<#= Type[T] #>[] buf, int Width, int Height) : this(buf, Width, Height, new CancellationTokenSource()) { }
+
+		public <#= T #>(int Width, int Height) : this(new <#= Type[T] #>[Width * Height], Width, Height, new CancellationTokenSource()) { }
+
+
+        //後評価なのでrefでなくても速度低下しないかも
+        //メモリかぶりしないなら、pixelはコンストラクタのみ初期化統一でいいかも
+
+
+
+		/*--------------------------------------*/
+		//   operator
+		/*--------------------------------------*/
+		#region operator 四則演算
+
+        public unsafe static <#= Op[T] #> operator +(<#= T #> x, <#= T #> y)
+		{
+			if (x.Size != y.Size) throw new ArgumentOutOfRangeException("operator Array Size");
+			
+			int size = x.Size;
+			<#= Type[Op[T]] #>[] dst = new <#= Type[Op[T]] #>[size];
+
+            fixed (<#= Type[T] #>* p_x = &x.pixel[0])
+			fixed (<#= Type[T] #>* p_y = &y.pixel[0])
+            fixed (<#= Type[Op[T]] #>* p_ret = &dst[0])
+            {
+                <#= Type[T] #>*	pt_x = p_x;
+				<#= Type[T] #>*	pt_y = p_y;
+                <#= Type[Op[T]] #>*	pt_ret = p_ret;
+
+				for (int i = 0; i < x.pixel.Length; ++i)
+                //for (int i = 0; i < size; ++i)
+				{
+                    *pt_ret++ = *pt_x++ + *pt_y++;
+				}
+				x.token.Token.ThrowIfCancellationRequested(); // 600くらい稼げる
+				
+				//1800 vs 2000
+				//for(int i = 0; i < x.pixel.Length; ++i)
+				//{
+				//	dst[i] = x[i] + y[i];
+				//	x.token.Token.ThrowIfCancellationRequested();
+				//}
+
+				//9479
+				//foreach (var i in x.pixel.Select((v, index) => new { v, index }))
+				//{
+				//dst[i.index] = x[i.index] + y[i.index];
+				//x.token.Token.ThrowIfCancellationRequested();
+				//}
+
+				//8900
+				//foreach (var i in x.pixel.Select((v, index) => new { v, index }))
+				//{
+				//dst[i.index] = i.v + y[i.index];
+				//x.token.Token.ThrowIfCancellationRequested();
+				//}
+
+            }
+            return new <#= Op[T] #>(dst, x.Width, y.Height, x.token);
+		}
+
+		public unsafe static <#= Op[T] #> operator -(<#= T #> x, <#= T #> y)
+		{
+			if (x.Size != y.Size) throw new ArgumentOutOfRangeException("operator Array Size");
+			
+			int size = x.Size;
+			<#= Type[Op[T]] #>[] dst = new <#= Type[Op[T]] #>[size];
+
+			//900
+			Parallel.For(0, size, i =>
+			{
+				dst[i] = x[i] + y[i];
+			});
+			x.token.Token.ThrowIfCancellationRequested();
+
+
+			//あまりきれいじゃないけど 以下みたいなのが落としどころ
+			for(int j=0;j<2;j++)
+			{
+				Parallel.For(0, size, i =>
+				{
+					dst[i] = x[i] + y[i];
+				});
+				x.token.Token.ThrowIfCancellationRequested();
+			}
+
+
+            return new <#= Op[T] #>(dst, x.Width, y.Height, x.token);
+		}
+
+		#endregion
+
+
+
+        /// <summary>
+        /// 平均値を求める, 一画素でもDouble介することによる誤差有
+        /// </summary>
+        /// <returns></returns>
+        public double Ave()
+        {
+            double ave = 0;
+
+            /*
+            int s = Size;
+            for (int i = 0; i < Size; i++)
+                ave += Convert.ToDouble(pixel[i]);
+            return ave / Size;
+            */
+
+            //ave = pixel.Select<T, double>(i => Convert.ToDouble(i)).Average();
+
+            foreach (<#= Type[T] #> i in pixel)
+                ave += Convert.ToDouble(i);
+
+            return ave / Size;
+        }
+	
+	}
+
+<# } #>
+}

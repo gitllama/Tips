@@ -1,0 +1,74 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ output extension=".cs" #>
+<#
+	var Type = new List<string>()
+	{
+		"Byte",
+		"UInt16",
+		"UInt32",
+		"UInt64",
+		"Int16",
+		"Int32",
+		"Int64",
+		"Single",
+		"Double"
+	};
+#>
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Linq.Expressions;
+
+using System.IO.Compression;
+using System.Threading.Tasks;
+
+namespace Pixels.Stream
+{
+    public static class PixelStream
+    {
+<# foreach (var T in Type){ #>
+        public static Pixel<<#= T #>> Read(this Pixel<<#= T #>> src, string filename, int offsetbyte, String type) =>  Read(src, filename, offsetbyte, System.Type.GetType($"System.{type}"));
+        public static Pixel<<#= T #>> Read(this Pixel<<#= T #>> src, string filename, int offsetbyte = 0, Type type = null)
+        {
+            byte[] data;
+            int count_byte = offsetbyte;
+            switch(type?.Name ?? "<#= T #>")
+            {
+<# foreach (var T2 in Type.Where(x => x != "Byte").ToArray()){ #>
+				case "<#= T2 #>":
+					data = System.IO.File.ReadAllBytes(filename);
+                    for (int i= 0; i< src.pixel.Length; i++)
+                    {
+                        src.pixel[i] = (<#= T #>)BitConverter.To<#= T2 #>(data, count_byte);
+                        count_byte += sizeof(<#= T2 #>);
+                    }
+                    break;
+<# } #>
+                case "Byte":
+					data = System.IO.File.ReadAllBytes(filename);
+                    for (int i= 0; i< src.pixel.Length; i++)
+                        src.pixel[i] = data[count_byte ++];
+                    break;
+                case "String":
+                    break;
+                default:
+                    
+                    break;
+            }
+            return src;
+        }
+<# } #>
+    }
+}

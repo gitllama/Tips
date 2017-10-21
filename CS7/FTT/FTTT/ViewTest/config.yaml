@@ -1,0 +1,22 @@
+﻿Type   : Int32
+Maps   :
+  Full :
+    Left   : 0
+    Top    : 0
+    Width  : 2256
+    Height : 1178
+  Active :
+    Left   : 10
+    Top    : 10
+    Width  : 2236
+    Height : 1158
+  Test :
+    Left   : 564
+    Top    : 294
+    Width  : 1128
+    Height : 589
+  HOB :
+    Left   : 0
+    Top    : 0
+    Width  : 100
+    Height : 1178
